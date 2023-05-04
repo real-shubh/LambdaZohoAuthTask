@@ -1,0 +1,27 @@
+{
+  "name": "lambdazohoauthtask",
+  "version": "1.0.0",
+  "description": "Refreshing the Zoho Creator access token using SQS and Lambda",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/real-shubh/LambdaZohoAuthTask.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mongodb": "^4.8.0",
+    "mongoose": "^6.4.4",
+    "querystring": "^0.2.1",
+    "realtimatecommon": "github:RealtimateLabs/RealtimateCommon",
+    "http-status-codes": "^2.2.0",
+    "jsonwebtoken": "^8.5.1"
+  },
+  "bugs": {
+    "url": "https://github.com/real-shubh/LambdaZohoAuthTask/issues"
+  },
+  "homepage": "https://github.com/real-shubh/LambdaZohoAuthTask#readme"
+}
