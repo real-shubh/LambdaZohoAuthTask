@@ -1,78 +1,108 @@
-console.log("Hi there!");
 ("use strict");
+var mongoose = require("mongoose");
 const https = require("https");
 const HttpStatus = require("http-status-codes");
 const { Results } = require("realtimatecommon/common/typedefs");
+const ZohoCreds = require("realtimatecommon/models/zoho-cred");
 const MessageQueue = require("realtimatecommon/aws/message-queue");
+const { resolve } = require("path");
+const { ObjectId } = require("mongodb");
 const ZohoTokenQueue = new MessageQueue(process.env.ZOHO_TOKEN_QUEUE);
-const clientId = process.env.ZOHO_CLIENT_ID;
-const clientSecret = process.env.ZOHO_CLIENT_SECRET;
+// const clientId = process.env.ZOHO_CLIENT_ID;
+// const clientSecret = process.env.ZOHO_CLIENT_SECRET;
+// const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
 
-exports.handler = async (event) => {
-  try {
-    console.log("Inside the handler!", event);
-    for (let i = 0; i < event.Records.length; i++) {
-      const record = event.Records[i];
-      var data;
-      try {
-        data = JSON.parse(record.body);
-        console.log("body: ",data);
-        var accessToken = data.refreshToken;
-        const options = {
-          hostname: "accounts.zoho.in",
-          protocol: "https:",
-          path:
-            "/oauth/v2/token?" +
-            `refresh_token=${accessToken}&client_id=${clientId}&client_secret=${clientSecret}&grant_type=refresh_token`,
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        };
-        const tokenReq = https.request(options, (res) => {
-          var chunks = "";
-          if (res.statusCode != 200) {
-            res.setEncoding("utf8");
-            console.log("there's some error buddy!", res.statusCode);
-            return;
-          } else {
-            res.on("data", (chunk) => {
-              chunks = chunks + chunk;
-              console.log("Chunks= ", chunks);
-            });
-            res.on("end", () => {
-              const result = JSON.parse(chunks);
-              console.log("result=", result);
-            });
-          }
+mongoose.set("strictQuery", true);
+mongoose.set("sanitizeProjection", true);
+const mongoosePromise = mongoose.connect(
+  process.env.MONGODB ||
+    "mongodb+srv://RealtimateDev:uEVLIPhHZzcuAftV@realtimatedev.rylvo.mongodb.net/RealtimateDev?retryWrites=true&w=majority"
+);
+
+exports.getRefreshToken = () => {
+  return new Promise((resolve, reject) => {
+    var credList;
+    ZohoCreds.find({ devCode: "Brigade" }).then((creds) => {
+      console.log("Creddd: ", creds);
+      if (creds) {
+        credList = creds;
+        credList.map((cred) => {
+          var clientId = cred.clientId;
+          var clientSecret = cred.clientSecret;
+          var refreshToken = cred.refreshToken;
+          var scope = cred.scope;
+          this.getRefreshedAccessToken(
+            cred._id,
+            clientId,
+            clientSecret,
+            refreshToken
+          );
         });
-        tokenReq.on("error", (error) => {
-          console.error("request has error: ", error);
-        });
-        tokenReq.end();
-      } catch (error) {
-        console.error(error);
-        console.error("Failed Task: ", record);
       }
-    }
-    console.log("finished!!!");
-    return {
-      statusCode: 200,
-      body: JSON.stringify("Access token refreshed!"),
-    };
+    });
+  });
+};
+
+exports.getRefreshedAccessToken = async (
+  credId,
+  clientId,
+  clientSecret,
+  refreshToken
+) => {
+  const options = {
+    hostname: "accounts.zoho.in",
+    protocol: "https:",
+    path:
+      "/oauth/v2/token?" +
+      `refresh_token=${refreshToken}&client_id=${clientId}&client_secret=${clientSecret}&grant_type=refresh_token`,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  };
+  try {
+    const tokenRequest = https.request(options, (res) => {
+      var chunks = "";
+      res.setEncoding("utf8");
+      if (res.statusCode != HttpStatus.OK) {
+        console.log("there's some error buddy!", res.statusCode);
+      } else {
+        res.on("data", (chunk) => {
+          chunks = chunks + chunk;
+        });
+        res.on("end", () => {
+          const result = JSON.parse(chunks);
+          console.log("result=", result);
+          if (result.error) {
+            console.error(result.error);
+            throw result.error;
+          } else {
+            ZohoCreds.updateOne(
+              { _id: ObjectId(credId) },
+              {
+                accessToken: result.access_token,
+              }
+            ).then((updateResult) => {
+              console.log("UPDATED!!!", updateResult);
+            });
+            console.log("JEE BAAT");
+          }
+          return result;
+        });
+      }
+    });
+    tokenRequest.on("error", (error) => {
+      console.error("request has error: ", error);
+    });
+    tokenRequest.end();
   } catch (error) {
-    console.error(error);
-    return { statusCode: 500, body: JSON.stringify(error) };
+    console.error("%%",error);
   }
 };
 
-this.handler({
-  Records: [
-    {
-      body: JSON.stringify({
-        refreshToken:
-          "1000.aaf4e3e88898d07611bb6b9648a417f9.f275c33cd63548a446e72a70efc16391",
-      }),
-    },
-  ],
-});
+exports.handler = async () => {
+  await mongoosePromise;
+  return this.getRefreshToken();
+};
+
+this.handler();
