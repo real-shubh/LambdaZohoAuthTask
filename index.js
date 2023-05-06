@@ -26,18 +26,24 @@ exports.getRefreshToken = () => {
       console.log("Creddd: ", creds);
       if (creds) {
         credList = creds;
+        Promise.all(
         credList.map((cred) => {
           var clientId = cred.clientId;
           var clientSecret = cred.clientSecret;
           var refreshToken = cred.refreshToken;
           var scope = cred.scope;
-          this.getRefreshedAccessToken(
+          return this.getRefreshedAccessToken(
             cred._id,
             clientId,
             clientSecret,
             refreshToken
           );
-        });
+        })).then((result) => {
+            resolve();
+          }).catch(error => {
+            console.error(error);
+            reject(error);
+          });
       }
     });
   });
@@ -102,7 +108,7 @@ exports.getRefreshedAccessToken = async (
 
 exports.handler = async () => {
   await mongoosePromise;
-  return this.getRefreshToken();
+  await this.getRefreshToken();
 };
 
 this.handler();
