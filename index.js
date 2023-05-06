@@ -23,24 +23,26 @@ exports.getRefreshToken = () => {
   return new Promise((resolve, reject) => {
     var credList;
     ZohoCreds.find({ devCode: "Brigade" }).then((creds) => {
-      console.log("Creddd: ", creds);
       if (creds) {
         credList = creds;
         Promise.all(
-        credList.map((cred) => {
-          var clientId = cred.clientId;
-          var clientSecret = cred.clientSecret;
-          var refreshToken = cred.refreshToken;
-          var scope = cred.scope;
-          return this.getRefreshedAccessToken(
-            cred._id,
-            clientId,
-            clientSecret,
-            refreshToken
-          );
-        })).then((result) => {
+          credList.map((cred) => {
+            var clientId = cred.clientId;
+            var clientSecret = cred.clientSecret;
+            var refreshToken = cred.refreshToken;
+            var scope = cred.scope;
+            return this.getRefreshedAccessToken(
+              cred._id,
+              clientId,
+              clientSecret,
+              refreshToken
+            );
+          })
+        )
+          .then((result) => {
             resolve();
-          }).catch(error => {
+          })
+          .catch((error) => {
             console.error(error);
             reject(error);
           });
@@ -67,42 +69,42 @@ exports.getRefreshedAccessToken = async (
     },
   };
   try {
-    const tokenRequest = https.request(options, (res) => {
-      var chunks = "";
-      res.setEncoding("utf8");
-      if (res.statusCode != HttpStatus.OK) {
-        console.log("there's some error buddy!", res.statusCode);
-      } else {
-        res.on("data", (chunk) => {
-          chunks = chunks + chunk;
-        });
-        res.on("end", () => {
-          const result = JSON.parse(chunks);
-          console.log("result=", result);
-          if (result.error) {
-            console.error(result.error);
-            throw result.error;
-          } else {
-            ZohoCreds.updateOne(
-              { _id: ObjectId(credId) },
-              {
-                accessToken: result.access_token,
-              }
-            ).then((updateResult) => {
-              console.log("UPDATED!!!", updateResult);
-            });
-            console.log("JEE BAAT");
-          }
-          return result;
-        });
-      }
+    return new Promise((resolve, reject) => {
+      const tokenRequest = https.request(options, (res) => {
+        var chunks = "";
+        res.setEncoding("utf8");
+        if (res.statusCode != HttpStatus.OK) {
+          console.log("Some error!", res.statusCode);
+        } else {
+          res.on("data", (chunk) => {
+            chunks = chunks + chunk;
+          });
+          res.on("end", async () => {
+            const result = JSON.parse(chunks);
+            if (result.error) {
+              console.error(result.error);
+              reject(result.error);
+            } else {
+              await ZohoCreds.updateOne(
+                { _id: ObjectId(credId) },
+                {
+                  accessToken: result.access_token,
+                }
+              ).then((updateResult) => {
+                console.log("UPDATED!!!", updateResult);
+                resolve(updateResult);
+              });
+            }
+          });
+        }
+      });
+      tokenRequest.on("error", (error) => {
+        console.error("request has error: ", error);
+      });
+      tokenRequest.end();
     });
-    tokenRequest.on("error", (error) => {
-      console.error("request has error: ", error);
-    });
-    tokenRequest.end();
   } catch (error) {
-    console.error("%%",error);
+    console.error("%%", error);
   }
 };
 
